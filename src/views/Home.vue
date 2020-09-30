@@ -402,12 +402,6 @@ export default {
         store.set('refSpeed', this.refSpeed)
         store.set('refDir', this.refDir)
         store.set('notes', this.notes)
-        store.set('rawSpeedMaxSw', this.rawSpeedMaxSw)
-        store.set('rawSpeedMinSw', this.rawSpeedMinSw)
-        store.set('rawSpeedAvgSw', this.rawSpeedAvgSw)
-        store.set('fSpeedMaxSw', this.fSpeedMaxSw)
-        store.set('fSpeedMinSw', this.fSpeedMinSw)
-        store.set('fSpeedAvgSw', this.fSpeedAvgSw)
 
         console.log('start capture ...')
         this.isCapturing = true
@@ -464,6 +458,24 @@ export default {
       this.dialog = false
     },
     addSpeedDirPoint(row) {
+      // "index": chartIndex1 + '',
+      //   "refSpeed": parseFloat(refSpeed),
+      //   "refDir": parseFloat(refDir),
+      //   "rawSpeedMax": lastSpeedMaxRaw,
+      //   "rawSpeedMin": lastSpeedMinRaw,
+      //   "rawSpeedAvg": lastSpeedAvgRaw,
+      //   "fSpeedMax": lastSpeedMaxF,
+      //   "fSpeedMin": lastSpeedMinF,
+      //   "fSpeedAvg": lastSpeedAvgF,
+      //   "dir": dir,
+      //   "timeLabel": lastTimestamp
+
+      if (!this.rawSpeedMaxSw) delete row["rawSpeedMax"]
+      if (!this.rawSpeedMinSw) delete row["rawSpeedMin"]
+      if (!this.rawSpeedAvgSw) delete row["rawSpeedAvg"]
+      if (!this.fSpeedMaxSw) delete row["fSpeedMax"]
+      if (!this.fSpeedMinSw) delete row["fSpeedMin"]
+      if (!this.fSpeedAvgSw) delete row["fSpeedAvg"]
       this.dsSpeedDir.push(row)
       if (this.dsSpeedDir.length > parseInt(this.plotPointNum)) {
         this.dsSpeedDir.shift()
@@ -509,6 +521,14 @@ export default {
       if (this.fSpeedMinSw) columns.push('fSpeedMin')
       if (this.fSpeedAvgSw) columns.push('fSpeedAvg')
       this.chartDataSpeed.columns = columns
+
+      store.set('rawSpeedMaxSw', this.rawSpeedMaxSw)
+      store.set('rawSpeedMinSw', this.rawSpeedMinSw)
+      store.set('rawSpeedAvgSw', this.rawSpeedAvgSw)
+      store.set('fSpeedMaxSw', this.fSpeedMaxSw)
+      store.set('fSpeedMinSw', this.fSpeedMinSw)
+      store.set('fSpeedAvgSw', this.fSpeedAvgSw)
+
     },
     saveCapture() {
       ipcRenderer.send('serial-rx', 'PFSP\r\n')
@@ -549,11 +569,10 @@ export default {
     this.fSpeedMaxSw = store.get('fSpeedMaxSw', true)
     this.fSpeedMinSw = store.get('fSpeedMinSw', true)
     this.fSpeedAvgSw = store.get('fSpeedAvgSw', true)
+
+    this.lineSwitchChanged()
   },
   mounted() {
-
-
-
     //serial
     ipcRenderer.on('init-serial-resp', (event, arg) => {
       console.log('init-serial-resp:', arg)

@@ -780,4 +780,3 @@ ipcMain.on('stop-capture', async (event) => {
 
 
 
-
