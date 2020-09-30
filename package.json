@@ -1,7 +1,7 @@
 {
   "name": "sensecap_one_testutil",
   "description": "SenseCAP One Test Util",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "homepage": "https://github.com/Seeed-Solution/SenseCAP-One-Test-Util",
   "repository": {
     "type": "git",
