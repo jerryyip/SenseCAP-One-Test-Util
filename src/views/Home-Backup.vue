@@ -202,46 +202,46 @@
         </v-card>
       </v-col>
     </v-row>
-<!--    <v-divider></v-divider>-->
+    <v-divider></v-divider>
     <!-- footer -->
-<!--    <v-row>-->
-<!--      <v-col cols="auto" class="d-flex flex-column align-center justify-center">-->
-<!--        <div style="width: 50px">-->
-<!--          <v-menu top offset-y close-on-click>-->
-<!--            <template v-slot:activator="{ on }">-->
-<!--              <span class="flag-icon" :class="flagIconClass" v-on="on"></span>-->
-<!--            </template>-->
-<!--            <v-list dense class="pa-0">-->
-<!--              <v-list-item-group v-model="locale">-->
-<!--                <v-list-item key="item1" class="py-0" link style="min-height: 30px;" value="en">-->
-<!--                  <v-list-item-title class="caption">English</v-list-item-title>-->
-<!--                </v-list-item>-->
-<!--                <v-list-item key="item2" class="py-0" link style="min-height: 30px;" value="zh">-->
-<!--                  <v-list-item-title class="caption">简体中文</v-list-item-title>-->
-<!--                </v-list-item>-->
-<!--              </v-list-item-group>-->
-<!--            </v-list>-->
-<!--          </v-menu>-->
-<!--        </div>-->
-<!--      </v-col>-->
-<!--      <v-col class="d-flex justify-center">-->
-<!--        <div>-->
-<!--          <v-img src="../assets/sensecap.png" width="100px" @click.stop="logoClicked()"></v-img>-->
-<!--        </div>-->
-<!--      </v-col>-->
-<!--      <v-col cols="auto" class="d-flex flex-column align-center justify-center caption grey&#45;&#45;text">-->
-<!--        <div>-->
-<!--          <v-tooltip top open-delay="1000" :disabled="!newVersion">-->
-<!--            <template v-slot:activator="{ on }">-->
-<!--              <v-badge color="pink" dot top :value="newVersion">-->
-<!--                <span v-on="on" @click="versionClicked()" id="versionText">v{{currentVersion}}</span>-->
-<!--              </v-badge>-->
-<!--            </template>-->
-<!--            <span>v{{newVersion}} available</span>-->
-<!--          </v-tooltip>-->
-<!--        </div>-->
-<!--      </v-col>-->
-<!--    </v-row>-->
+    <v-row>
+      <v-col cols="auto" class="d-flex flex-column align-center justify-center">
+        <div style="width: 50px">
+          <v-menu top offset-y close-on-click>
+            <template v-slot:activator="{ on }">
+              <span class="flag-icon" :class="flagIconClass" v-on="on"></span>
+            </template>
+            <v-list dense class="pa-0">
+              <v-list-item-group v-model="locale">
+                <v-list-item key="item1" class="py-0" link style="min-height: 30px;" value="en">
+                  <v-list-item-title class="caption">English</v-list-item-title>
+                </v-list-item>
+                <v-list-item key="item2" class="py-0" link style="min-height: 30px;" value="zh">
+                  <v-list-item-title class="caption">简体中文</v-list-item-title>
+                </v-list-item>
+              </v-list-item-group>
+            </v-list>
+          </v-menu>
+        </div>
+      </v-col>
+      <v-col class="d-flex justify-center">
+        <div>
+          <v-img src="../assets/sensecap.png" width="100px" @click.stop="logoClicked()"></v-img>
+        </div>
+      </v-col>
+      <v-col cols="auto" class="d-flex flex-column align-center justify-center caption grey--text">
+        <div>
+          <v-tooltip top open-delay="1000" :disabled="!newVersion">
+            <template v-slot:activator="{ on }">
+              <v-badge color="pink" dot top :value="newVersion">
+                <span v-on="on" @click="versionClicked()" id="versionText">v{{currentVersion}}</span>
+              </v-badge>
+            </template>
+            <span>v{{newVersion}} available</span>
+          </v-tooltip>
+        </div>
+      </v-col>
+    </v-row>
 
     <!-- dialog -->
     <v-dialog

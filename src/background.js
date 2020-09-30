@@ -428,6 +428,7 @@ ipcMain.on('serial-close-req', (event, arg) => {
 
 ipcMain.on('serial-rx', (event, arg) => {
   if (serial && serial.isOpen) {
+    logger.debug(`serial-rx: ${arg}`)
     serial.write(arg)
   }
 })

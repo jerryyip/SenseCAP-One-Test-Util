@@ -61,11 +61,13 @@
               outlined dense hide-details>
             </v-text-field>
           </v-card>
-          <v-card flat class="col-6">
+          <v-card flat class="">
             <v-btn rounded color="secondary" width="100"
               @click.stop="changeFontSizeFn()">{{$t('OK')}}</v-btn>
             <v-btn rounded color="secondary" width="100" class="ml-5"
               @click.stop="clearTerminalFn()">{{$t('Clear')}}</v-btn>
+            <v-btn rounded color="secondary" width="100" class="ml-5"
+              @click.stop="sendStopFn()">{{$t('PFSP')}}</v-btn>
           </v-card>
         </v-card>
       </v-col>
@@ -141,6 +143,9 @@ export default {
     },
     clearTerminalFn() {
       this.term.clear()
+    },
+    sendStopFn() {
+      ipcRenderer.send('serial-rx', "PFSP\r\n")
     }
   },
   created() {

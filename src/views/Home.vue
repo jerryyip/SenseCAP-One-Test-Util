@@ -50,7 +50,7 @@
     <v-row v-resize="onWindowResize">
       <!-- 左半屏，输入框 -->
       <v-col cols="4" xl="3">
-        <v-form ref="form1">
+        <v-container fluid class="align-content-space-between pa-0" fill-height>
         <v-row class="pt-1">
           <!-- Fields -->
           <!-- connection -->
@@ -126,7 +126,7 @@
               @click.stop="openDialog()"
               :disabled="!!dialog">{{$t('Settings')}}</v-btn>
           </v-col>
-          <v-col cols="12" class="pa-5 d-flex flex-wrap justify-start">
+          <v-col cols="12" class="px-5 d-flex flex-wrap justify-start">
             <v-switch v-model="rawSpeedMaxSw" :label="$t('rawSpeedMax')" @change="lineSwitchChanged"></v-switch>
             <v-switch v-model="rawSpeedMinSw" :label="$t('rawSpeedMin')" @change="lineSwitchChanged"></v-switch>
             <v-switch v-model="rawSpeedAvgSw" :label="$t('rawSpeedAvg')" @change="lineSwitchChanged"></v-switch>
@@ -135,7 +135,21 @@
             <v-switch v-model="fSpeedAvgSw" :label="$t('fSpeedAvg')" @change="lineSwitchChanged"></v-switch>
           </v-col>
         </v-row>
-        </v-form>
+        <v-row>
+          <v-col cols="2" class="d-flex align-center justify-center caption grey--text">
+            <div>
+              <v-tooltip top open-delay="1000" :disabled="!newVersion">
+                <template v-slot:activator="{ on }">
+                  <v-badge color="pink" dot top :value="newVersion">
+                    <span v-on="on" @click="versionClicked()" id="versionText">v{{currentVersion}}</span>
+                  </v-badge>
+                </template>
+                <span>v{{newVersion}} available</span>
+              </v-tooltip>
+            </div>
+          </v-col>
+        </v-row>
+        </v-container>
       </v-col>
 
       <!-- 右半屏，plots -->
@@ -399,7 +413,7 @@ export default {
       } else {
         console.log('stop capture ...')
         if (this.isPrinting) {
-          ipcRenderer.send('serial-rx', 'PFSP\r\nPFSP\r\nPFSP\r\n')
+          ipcRenderer.send('serial-rx', 'PFSP\r\n')
           await delayMs(1000)
           this.isPrinting = false
         }
@@ -414,7 +428,7 @@ export default {
       if (this.isPrinting) {
         ipcRenderer.send('serial-rx', 'PFSR\r\n')
       } else {
-        ipcRenderer.send('serial-rx', 'PFSP\r\nPFSP\r\nPFSP\r\n')
+        ipcRenderer.send('serial-rx', 'PFSP\r\n')
       }
     },
     printFilteredFn() {
@@ -422,7 +436,7 @@ export default {
       if (this.isPrinting) {
         ipcRenderer.send('serial-rx', 'PFSF\r\n')
       } else {
-        ipcRenderer.send('serial-rx', 'PFSP\r\nPFSP\r\nPFSP\r\n')
+        ipcRenderer.send('serial-rx', 'PFSP\r\n')
       }
     },
     openDialog() {
