@@ -15,6 +15,14 @@ const fs = require('fs')
 const fsPromises = fs.promises
 const Store = require('electron-store')
 const store = new Store()
+const { Readable } = require('stream')
+const RegexParser = require('@serialport/parser-regex')
+const ReadlineParser = require('@serialport/parser-readline')
+const csvStringify = require('csv-stringify')
+const dateFormat = require('dateformat')
+const { tppl } = require('tppl')
+const { tplSource } = require('./veusz-template')
+
 
 let appName = "SenseCAP One Test Util"
 app.name = appName
@@ -33,11 +41,53 @@ let sysLocale
 
 let serialPorts = []
 let selectedSerialPort
+let selectedSerialBaud
 let serial
 let ymodem = new yModem(true, logger.debug)
 let updating = false
 
+let isCapturing = false
+let smParseWaveSignal = 'idle'  //idle, open
+let customParseCallback = null
+let pauseParseLine = false
+let deviceID = ""
+let refSpeed = 10
+let refDir = 0
+let notes = ""
+let lastTimestamp = 0
+let lastSpeedMaxRaw = 0
+let lastSpeedMinRaw = 0
+let lastSpeedAvgRaw = 0
+let lastSpeedMaxF = 0
+let lastSpeedMinF = 0
+let lastSpeedAvgF = 0
+let lastDirAvgRaw = 0
+let chartIndex1 = 1
+let chartIndex2 = 1
+let dsSpeedDir = []  //item: [timestamp, refSpeed, refDir, rawSpeedMax, rawSpeedMin, rawSpeedAvg,
+                     //       fSpeedMax, fSpeedMin, fSpeedAvg, dir]
+let dsSignal = []    //item: [timeIndex, signalVal, label]
+
+//stream
+const stream = new Readable({
+  read: (size) => {}
+})
+
+//tppl render func
+const tpplRender = tppl(tplSource)
+
+//parser
+const parser = stream.pipe(new ReadlineParser())
+
+const homedir = require('os').homedir()
+
+//auto update
 let autoUpdateTimeHandler = null
+
+const delayMs = ms => new Promise(res => setTimeout(res, ms))
+
+
+
 
 /**
  * The Menu's locale only follows the system, the user selection from the GUI doesn't affect
@@ -150,7 +200,7 @@ function createMainWindow () {
 
 function createConsoleWindow () {
   // Create the browser window.
-  let w = 800
+  let w = 600
   let h = 900
 
   if (process.platform === 'win32') {
@@ -284,7 +334,7 @@ ipcMain.on('init-serial-req', (event, arg) => {
 
 function serialOpen(event) {
   serial = new SerialPort(selectedSerialPort, {
-    baudRate: 115200,
+    baudRate: selectedSerialBaud || 115200,
     autoOpen: false
   })
 
@@ -298,9 +348,15 @@ function serialOpen(event) {
   })
 
   serial.on('data', (data) => {
-    if (win) {
-      win.webContents.send('serial-tx', data)
+    // if (win) {
+    //   win.webContents.send('serial-tx', data)
+    // }
+    if (isCapturing) stream.push(data)
+
+    if (winConsole) {
+      winConsole.webContents.send('serial-tx', data)
     }
+
     if (ymodem && updating) {
       ymodem.emit('rx', data)
     }
@@ -328,8 +384,8 @@ async function serialCloseAsync() {
   })
 }
 
-ipcMain.on('serial-open-req', (event, selPort) => {
-  logger.info('serial-open-req ...', selPort)
+ipcMain.on('serial-open-req', (event, selPort, baud) => {
+  logger.info(`serial-open-req, ${selPort}, ${baud} ...`)
 
   if (serial && serial.isOpen) {
     if (selPort === selectedSerialPort) {
@@ -339,12 +395,14 @@ ipcMain.on('serial-open-req', (event, selPort) => {
     } else {
       logger.warn('request to open another port, rather', selectedSerialPort)
       selectedSerialPort = selPort
+      selectedSerialBaud = baud
       serialClose(() => {
         serialOpen(event)
       })
     }
   } else {
     selectedSerialPort = selPort
+    selectedSerialBaud = baud
     serialOpen(event)
   }
 })
@@ -410,16 +468,15 @@ function ymodemWrite(chunk, resolve, reject) {
   }
 }
 
-ipcMain.on('select-file', async (event, selPort) => {
-  logger.info('select file ...')
+ipcMain.on('select-dir', async (event, selPort) => {
+  logger.info('select dir ...')
   let {canceled, filePaths} = await dialog.showOpenDialog({
-    filters: [{ name: 'Binaries', extensions: ['bin', 'hex']}, { name: 'All Files', extensions: ['*']}],
-    properties: ['openFile', 'noResolveAliases']
+    properties: ['openDirectory', 'createDirectory', 'noResolveAliases']
   })
 
   if (!canceled) {
     let filePath = filePaths[0]
-    logger.info('selected file:', filePath)
+    logger.info('selected dir:', filePath)
     if (!filePath) return
 
     try {
@@ -430,40 +487,10 @@ ipcMain.on('select-file', async (event, selPort) => {
       return
     }
 
-    let fileName = path.basename(filePath)
-    await sendToTerm('\n\r\nStart to update the firmware ...\r\n')
-    let {size} = await fsPromises.stat(filePath)
-    await sendToTerm(`${fileName}\r\nsize: ${size}\r\n`)
+    event.reply('select-dir-resp', filePath)
 
-    let fileContent = await fsPromises.readFile(filePath)
-    if (fileContent) {
-      event.reply('update-fw-begin')
-      updateTimeoutHandler = setTimeout(updateTimeout, 300000)
-
-      ymodem.clearStream()
-      ymodem.on('progress', progressCallback)
-      ymodem.on('tx', ymodemWrite)
-      updating = true
-      try {
-        await ymodem.transfer(fileContent)
-      } catch (error) {
-        logger.warn('ymodem transfer error:', error)
-        await sendToTerm(`\r\nerror: ${error.message} \r\n`)
-      }
-      updating = false
-      ymodem.removeAllListeners('progress')
-      ymodem.removeAllListeners('tx')
-      if (updateTimeoutHandler) {
-        clearTimeout(updateTimeoutHandler)
-        updateTimeoutHandler = null
-      }
-      if (win) {
-        win.webContents.send('update-fw-end')
-      }
-    }
   } else {
-    logger.info('file selection cancelled by user')
-    serial.write('a')
+    logger.info('dir selection cancelled by user')
   }
 
 })
@@ -485,7 +512,7 @@ ipcMain.on('goto-new-version', (event) => {
   shell.openExternal('https://github.com/Seeed-Solution/SenseCAP-One-Test-Util/releases/latest')
 })
 
-//Console Windows
+//Console Window
 ipcMain.on('open-console-window', (event) => {
   logger.info('ipc: open-console-window ...')
   if (winConsole) {
@@ -495,4 +522,261 @@ ipcMain.on('open-console-window', (event) => {
     createConsoleWindow()
   }
 })
+
+//Data Capture and Parse
+
+function addSpeedDirPoint() {
+  //item: [timestamp, refSpeed, refDir, rawSpeedMax, rawSpeedMin, rawSpeedAvg,
+  //       fSpeedMax, fSpeedMin, fSpeedAvg, dir]
+  let dir = lastDirAvgRaw
+  if (dir - parseFloat(refDir) > 180) dir -= 360
+  let row = {
+    "index": chartIndex1 + '',
+    "refSpeed": parseFloat(refSpeed),
+    "refDir": parseFloat(refDir),
+    "rawSpeedMax": lastSpeedMaxRaw,
+    "rawSpeedMin": lastSpeedMinRaw,
+    "rawSpeedAvg": lastSpeedAvgRaw,
+    "fSpeedMax": lastSpeedMaxF,
+    "fSpeedMin": lastSpeedMinF,
+    "fSpeedAvg": lastSpeedAvgF,
+    "dir": dir,
+    "timeLabel": lastTimestamp
+  }
+
+  dsSpeedDir.push(row)
+  chartIndex1++
+
+  if (win) {
+    win.webContents.send('add-data-row', row)
+  }
+}
+
+function addWaveSignalPoint (adcValue, label) {
+  let indexSigLabel = label ? chartIndex2 + '' : ""
+  let labelYPos = label ? "1000" : ""
+  let row = {
+    "indexSig": chartIndex2 + '',
+    "adcValue": adcValue,
+    "labelSig": label,
+    "indexSigLabel": indexSigLabel,
+    "labelYPos": labelYPos
+  }
+  dsSignal.push(row)
+  chartIndex2++
+
+}
+
+function parseLine(line) {
+  if (customParseCallback) {
+    customParseCallback(line)
+  }
+
+  let found
+  found = line.match(/^(\w+)_TX_BEG/i)
+  if (found) {
+    logger.debug('found TX_BEG:', found[0])
+    addWaveSignalPoint(0, found[1] + '-TX-BEG, ' + chartIndex1)
+    smParseWaveSignal = 'open'
+    return
+  }
+  found = line.match(/^\w+_TX_END/i)
+  if (found) {
+    logger.debug('found TX_END:', found[0])
+    //addWaveSignalPoint(0, found[0] + ', ' + chartIndex1)
+    smParseWaveSignal = 'idle'
+    return
+  }
+  if (smParseWaveSignal === 'open') {
+    found = line.match(/^-?\d+/i)
+    if (found) {
+      addWaveSignalPoint(parseInt(found), '')
+    }
+    return
+  }
+
+  found = line.match(/^\d{7}\.\d{3}/i)
+  if (found) {
+    logger.debug('found timestamp:', found[0])
+    lastTimestamp = parseFloat(found[0])
+    return
+  }
+  found = line.match(/SPEED_MAX_R:\s+(\d+\.\d+)/i)
+  if (found) {
+    logger.debug('found SPEED_MAX_R:', found[1])
+    lastSpeedMaxRaw = parseFloat(found[1])
+    return
+  }
+  found = line.match(/SPEED_MIN_R:\s+(\d+\.\d+)/i)
+  if (found) {
+    logger.debug('found SPEED_MIN_R:', found[1])
+    lastSpeedMinRaw = parseFloat(found[1])
+    return
+  }
+  found = line.match(/SPEED_AVG_R:\s+(\d+\.\d+)/i)
+  if (found) {
+    logger.debug('found SPEED_AVG_R:', found[1])
+    lastSpeedAvgRaw = parseFloat(found[1])
+    return
+  }
+  found = line.match(/SPEED_MAX_F:\s+(\d+\.\d+)/i)
+  if (found) {
+    logger.debug('found SPEED_MAX_F:', found[1])
+    lastSpeedMaxF = parseFloat(found[1])
+    return
+  }
+  found = line.match(/SPEED_MIN_F:\s+(\d+\.\d+)/i)
+  if (found) {
+    logger.debug('found SPEED_MIN_F:', found[1])
+    lastSpeedMinF = parseFloat(found[1])
+    return
+  }
+  found = line.match(/SPEED_AVG_F:\s+(\d+\.\d+)/i)
+  if (found) {
+    logger.debug('found SPEED_AVG_F:', found[1])
+    lastSpeedAvgF = parseFloat(found[1])
+    return
+  }
+  found = line.match(/DIRECTION_AVG_R:\s+(\d+\.\d+)/i)
+  if (found) {
+    logger.debug('found DIRECTION_AVG_R:', found[1])
+    lastDirAvgRaw = parseFloat(found[1])
+    addSpeedDirPoint()
+    return
+  }
+}
+
+function genFilePath(ext) {
+  let now = new Date()
+  let datetimeStr = dateFormat(now, "yyyymmdd-HHMMss")
+  let _devID = `${deviceID}` || "devXXX"
+  let _refSpeed = `${refSpeed}` || "refSpeed"
+  let _refDir = `${refDir}` || "refDir"
+  let _ext = ext || "txt"
+
+  return `${_devID}-${_refSpeed}-${_refDir}-${datetimeStr}.${_ext}`
+}
+
+function buildVeuszFile(workDir, filePath, sigFilePath) {
+  //'rawSpeedMax', 'rawSpeedMin', 'rawSpeedAvg',
+  //     'fSpeedMax', 'fSpeedMin', 'fSpeedAvg'
+  let data = {
+    workDir: workDir,
+    signalCSVFilePath: sigFilePath,
+    csvFilePath: filePath,
+    notes: notes,
+    plots: [
+      {name: "refSpeed", hide: "False"},
+      {name: "rawSpeedMax", hide: "True"},
+      {name: "rawSpeedMin", hide: "True"},
+      {name: "rawSpeedAvg", hide: "False"},
+      {name: "fSpeedMax", hide: "True"},
+      {name: "fSpeedMin", hide: "True"},
+      {name: "fSpeedAvg", hide: "False"},
+    ]
+  }
+  return tpplRender(data)
+}
+
+parser.on('data', (line) => {
+  // logger.debug(line, 'len:', line.length)
+  parseLine(line)
+})
+
+ipcMain.on('start-capture', (event, _refSpeed, _refDir, _deviceID, _notes) => {
+  logger.info('start-capture ...')
+  refSpeed = _refSpeed
+  refDir = _refDir
+  deviceID = _deviceID
+  notes = _notes
+  isCapturing = true
+  dsSpeedDir = []
+  dsSignal = []
+  chartIndex1 = 1
+  chartIndex2 = 1
+})
+
+ipcMain.on('stop-capture', async (event) => {
+  logger.info('stop-capture ...')
+  isCapturing = false
+
+  //Save Capture
+  let workDir = store.get('workDir', homedir)
+  let filePath = workDir + "/" + genFilePath("csv")
+  let filePathSig = ""
+  let filePathVeusz = workDir + "/" + genFilePath("vsz")
+  let writeStream1 = fs.createWriteStream(filePath)
+
+  const rowHeader = ['index', 'refSpeed', 'refDir', 'rawSpeedMax', 'rawSpeedMin', 'rawSpeedAvg',
+    'fSpeedMax', 'fSpeedMin', 'fSpeedAvg', 'dir', 'timeLabel']
+  const csvStringifier1 = csvStringify({
+    header: true,
+    columns: rowHeader
+  })
+
+  csvStringifier1.pipe(writeStream1)
+
+  for (let row of dsSpeedDir) {
+    let rowArray = []
+    for (const field of rowHeader) {
+      rowArray.push(row[field])
+    }
+    csvStringifier1.write(rowArray)
+  }
+
+  csvStringifier1.end()
+
+  logger.info(`write to ${filePath} done!`)
+
+  let htimeout = setTimeout(() => {
+    event.reply('stop-capture-resp', true)
+  }, 30000)
+
+  writeStream1.on('close', () => {
+    event.reply('stop-capture-resp', true)
+    clearTimeout(htimeout)
+  })
+
+  if (dsSignal.length > 0) {
+    filePathSig = workDir + "/" + genFilePath("signal.csv")
+    let writeStream2 = fs.createWriteStream(filePathSig)
+
+    const rowHeader2 = ['indexSig', 'adcValue', 'labelSig', 'indexSigLabel', 'labelYPos']
+    const csvStringifier2 = csvStringify({
+      header: true,
+      quoted_string: true,
+      columns: rowHeader2
+    })
+
+    csvStringifier2.pipe(writeStream2)
+
+    for (let row of dsSignal) {
+      let rowArray = []
+      for (const field of rowHeader2) {
+        rowArray.push(row[field])
+      }
+      csvStringifier2.write(rowArray)
+    }
+
+    csvStringifier2.end()
+
+    logger.info(`write to ${filePathSig} done!`)
+  }
+
+  //write the veusz file
+  const fileSrcStream = new Readable({
+    read: (size) => {}
+  })
+  let writeStream3 = fs.createWriteStream(filePathVeusz)
+  fileSrcStream.pipe(writeStream3)
+  fileSrcStream.push(buildVeuszFile(workDir, filePath, filePathSig))
+  fileSrcStream.push(null)
+})
+
+
+
+
+
+
+
 

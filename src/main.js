@@ -7,8 +7,11 @@ import 'roboto-fontface/css/roboto/roboto-fontface.css'
 import '@mdi/font/css/materialdesignicons.css'
 import i18n from './plugins/i18n'
 import 'flag-icon-css/css/flag-icon.css'
+import VCharts from 'v-charts'
 
 Vue.config.productionTip = false
+
+Vue.use(VCharts)
 
 new Vue({
   router,
