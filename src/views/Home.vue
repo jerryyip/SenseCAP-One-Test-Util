@@ -458,24 +458,6 @@ export default {
       this.dialog = false
     },
     addSpeedDirPoint(row) {
-      // "index": chartIndex1 + '',
-      //   "refSpeed": parseFloat(refSpeed),
-      //   "refDir": parseFloat(refDir),
-      //   "rawSpeedMax": lastSpeedMaxRaw,
-      //   "rawSpeedMin": lastSpeedMinRaw,
-      //   "rawSpeedAvg": lastSpeedAvgRaw,
-      //   "fSpeedMax": lastSpeedMaxF,
-      //   "fSpeedMin": lastSpeedMinF,
-      //   "fSpeedAvg": lastSpeedAvgF,
-      //   "dir": dir,
-      //   "timeLabel": lastTimestamp
-
-      if (!this.rawSpeedMaxSw) delete row["rawSpeedMax"]
-      if (!this.rawSpeedMinSw) delete row["rawSpeedMin"]
-      if (!this.rawSpeedAvgSw) delete row["rawSpeedAvg"]
-      if (!this.fSpeedMaxSw) delete row["fSpeedMax"]
-      if (!this.fSpeedMinSw) delete row["fSpeedMin"]
-      if (!this.fSpeedAvgSw) delete row["fSpeedAvg"]
       this.dsSpeedDir.push(row)
       if (this.dsSpeedDir.length > parseInt(this.plotPointNum)) {
         this.dsSpeedDir.shift()
