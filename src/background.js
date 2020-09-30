@@ -127,7 +127,7 @@ async function translateMenu() {
       defaultMenu[5].submenu.push({
         label: t('Report an issue'),
         click: () => {
-          shell.openExternal('https://github.com/Seeed-Solution/SenseCAP-One-Test-Util/issues')
+          shell.openExternal('https://github.com/KillingJacky/SenseCAP-One-Test-Util/issues')
         }
       })
       logger.debug(JSON.stringify(defaultMenu))
@@ -509,7 +509,7 @@ ipcMain.on('locale-change', (event, arg) => {
 })
 
 ipcMain.on('goto-new-version', (event) => {
-  shell.openExternal('https://github.com/Seeed-Solution/SenseCAP-One-Test-Util/releases/latest')
+  shell.openExternal('https://github.com/KillingJacky/SenseCAP-One-Test-Util/releases/latest')
 })
 
 //Console Window
