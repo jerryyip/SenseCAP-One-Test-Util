@@ -703,9 +703,10 @@ ipcMain.on('stop-capture', async (event) => {
 
   //Save Capture
   let workDir = store.get('workDir', homedir)
-  let filePath = workDir + "/" + genFilePath("csv")
+  workDir = path.normalize(workDir)
+  let filePath = path.join(workDir, genFilePath("csv"))
   let filePathSig = ""
-  let filePathVeusz = workDir + "/" + genFilePath("vsz")
+  let filePathVeusz = path.join(workDir, genFilePath("vsz"))
   let writeStream1 = fs.createWriteStream(filePath)
 
   const rowHeader = ['index', 'refSpeed', 'refDir', 'rawSpeedMax', 'rawSpeedMin', 'rawSpeedAvg',
@@ -739,7 +740,7 @@ ipcMain.on('stop-capture', async (event) => {
   })
 
   if (dsSignal.length > 0) {
-    filePathSig = workDir + "/" + genFilePath("signal.csv")
+    filePathSig = path.join(workDir, genFilePath("signal.csv"))
     let writeStream2 = fs.createWriteStream(filePathSig)
 
     const rowHeader2 = ['indexSig', 'adcValue', 'labelSig', 'indexSigLabel', 'labelYPos']
