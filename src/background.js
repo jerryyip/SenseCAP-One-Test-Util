@@ -774,7 +774,7 @@ ipcMain.on('stop-capture', async (event) => {
   })
   let writeStream3 = fs.createWriteStream(filePathVeusz)
   fileSrcStream.pipe(writeStream3)
-  let workDirEsp = workDir.replace('\\', '\\\\')
+  let workDirEsp = workDir.replace(/\\/g, '\\\\')
   fileSrcStream.push(buildVeuszFile(workDirEsp, fileName, fileNameSig))
   fileSrcStream.push(null)
 })
