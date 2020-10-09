@@ -1,7 +1,7 @@
 {
   "name": "sensecap_one_testutil",
   "description": "SenseCAP One Test Util",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "homepage": "https://github.com/KillingJacky/SenseCAP-One-Test-Util",
   "repository": {
     "type": "git",

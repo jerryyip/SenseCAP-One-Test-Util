@@ -703,9 +703,12 @@ ipcMain.on('stop-capture', async (event) => {
 
   //Save Capture
   let workDir = store.get('workDir', homedir)
-  let filePath = workDir + "/" + genFilePath("csv")
+  workDir = path.normalize(workDir)
+  let fileName = genFilePath("csv")
+  let filePath = path.join(workDir, fileName)
+  let fileNameSig = ""
   let filePathSig = ""
-  let filePathVeusz = workDir + "/" + genFilePath("vsz")
+  let filePathVeusz = path.join(workDir, genFilePath("vsz"))
   let writeStream1 = fs.createWriteStream(filePath)
 
   const rowHeader = ['index', 'refSpeed', 'refDir', 'rawSpeedMax', 'rawSpeedMin', 'rawSpeedAvg',
@@ -739,7 +742,8 @@ ipcMain.on('stop-capture', async (event) => {
   })
 
   if (dsSignal.length > 0) {
-    filePathSig = workDir + "/" + genFilePath("signal.csv")
+    fileNameSig = genFilePath("signal.csv")
+    filePathSig = path.join(workDir, fileNameSig)
     let writeStream2 = fs.createWriteStream(filePathSig)
 
     const rowHeader2 = ['indexSig', 'adcValue', 'labelSig', 'indexSigLabel', 'labelYPos']
@@ -770,7 +774,8 @@ ipcMain.on('stop-capture', async (event) => {
   })
   let writeStream3 = fs.createWriteStream(filePathVeusz)
   fileSrcStream.pipe(writeStream3)
-  fileSrcStream.push(buildVeuszFile(workDir, filePath, filePathSig))
+  let workDirEsp = workDir.replace('\\', '\\\\')
+  fileSrcStream.push(buildVeuszFile(workDirEsp, fileName, fileNameSig))
   fileSrcStream.push(null)
 })
 
