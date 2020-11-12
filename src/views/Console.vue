@@ -53,6 +53,18 @@
         <v-card outlined class="pl-2 pt-2 flex-grow-1 flex-shrink-0 d-flex flex-row align-stretch" >
           <div id="terminal" style="width: 100%"></div>
         </v-card>
+        <!-- Input area -->
+        <v-card flat class="pt-2 flex-shrink-0 d-flex flex-row align-center">
+          <v-card flat class="col-10 pl-0">
+            <v-text-field v-model="txCmd" outlined dense hide-details cols="6" label="TX" autofocus
+              :rules="[rules.required]"
+            ></v-text-field>
+          </v-card>
+          <v-card flat >
+            <v-btn rounded color="secondary" width="100" @click="sendCmd()">{{$t('SEND')}}</v-btn>
+          </v-card>
+        </v-card>
+
         <!--Settings and Buttons-->
         <v-card flat class="pt-2 flex-shrink-0 d-flex flex-row align-center">
           <v-card flat class="col-2 pl-0">
@@ -120,6 +132,7 @@ export default {
       terminalFontSize: 10,
       terminalFontSizeReal: 10,
       hTimeoutResize: null,
+      txCmd: '0XA;',
     }
   },
   methods: {
@@ -146,6 +159,12 @@ export default {
     },
     sendStopFn() {
       ipcRenderer.send('serial-rx', "PFSP\r\n")
+    },
+    sendCmd() {
+      let data = this.txCmd
+      data = data + '\r\n'
+      this.term.write(data)
+      ipcRenderer.send('serial-rx', `${data}`)
     }
   },
   created() {

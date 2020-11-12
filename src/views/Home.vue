@@ -36,6 +36,17 @@
     "Do it": "清空",
     "Connect": "连接",
     "Disconnect": "断开",
+    "Ascii Mode": "ASCII模式",
+    "RAW RW": "RAW参数读写",
+    "RAW Read": "读取RAW参数",
+    "RAW Send": "发送RAW参数",
+    "EXP Read": "读取EXP参数",
+    "Are you sure you want to clear all RAW?": "确认要清除所有RAW参数吗？",
+    "Please confirm": "请确认",
+    "COR_COR": "计算EXP参数",
+    "CLR_CLR": "清除所有RAW参数",
+    "Get_All_Raw": "读取所有RAW参数",
+    "Get_All_Exp": "读取所有EXP参数",
 
     "Must between [5, 43200]": "必须在[5, 43200]范围内",
     "Must between [5, 720]": "必须在[5, 720]范围内",
@@ -77,6 +88,9 @@
               :items="baudRates" :rules="[rules.int]"
               outlined dense>
             </v-combobox>
+          </v-col>
+          <v-col cols="12" md="6" class="py-0">
+            <v-switch v-model="asciiMode" :label="$t('Ascii Mode')"></v-switch>
           </v-col>
           <v-col cols="12" md="6" class="py-0">
           </v-col>
@@ -157,8 +171,123 @@
         </v-container>
       </v-col>
 
-      <!-- 右半屏，plots -->
-      <v-col cols="8" xl="9">
+      <!-- 中屏 参数录入 -->
+      <v-col v-if="asciiMode" cols="4" xl="4">
+        <v-card class="col-12 mt-2" width="100%">
+
+        <v-simple-table id="tab">
+          <template v-slot:default>
+            <thead>
+              <!--  表头 -->
+              <tr>
+                <th class="text-left">DEG(°)</th>
+                <th class="text-left">SPD(m/s)</th>
+                <th class="text-left">OBJ(m/s)</th>
+                <th class="text-left">RAW(m/s)</th>
+                <th class="text-left">ACTION</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- 表格内容 -->
+              <tr v-for="item in desserts" :key="item.id">
+                <td>
+                  <v-select v-if="item.id != 3" v-model="item.degValue" :items="degList1" autofocus></v-select>
+                  <v-select v-if="item.id === 3" v-model="item.degValue" :items="degList2" autofocus></v-select>
+                </td>
+                <td>
+                  <v-select v-model="item.spdIndex" :items="spdList" autofocus></v-select>
+                </td>
+                <td>
+                  <v-text-field v-model="item.objValue" :readonly="item.readonly" autofocus></v-text-field>
+                </td>
+                <td>
+                  <v-text-field v-model="item.rawValue" :readonly="item.readonly" autofocus></v-text-field>
+                </td>
+                <!-- 按钮区域 -->
+                <td>
+                  <v-btn v-if="item.id === 1" rounded color="primary" dark width="100" :loading="ldSendCmd"
+                  @click="sendRawCmd(item)" small style="margin-right: 15px;" >{{ $t('RAW Send') }}</v-btn>
+                  <v-btn v-if="item.id === 2" rounded color="primary" dark width="100" :loading="ldSendCmd"
+                  @click="sendRawCmd(item)" small style="margin-right: 15px;" >{{ $t('RAW Read') }}</v-btn>
+                  <v-btn v-if="item.id === 3" rounded color="primary" dark width="100" :loading="ldSendCmd"
+                  @click="sendRawCmd(item)" small style="margin-right: 15px;" >{{ $t('EXP Read') }}</v-btn>
+                </td>
+              </tr>
+            </tbody>
+          </template>
+        </v-simple-table>
+        <!-- 按钮区域 -->
+        <v-col cols="12" class="py-5 d-flex justify-space-around">
+          <v-btn rounded color="secondary" width="200" :loading="ldSendCmd" @click="sendCorCmd()">{{$t('COR_COR')}}</v-btn>
+          <v-btn rounded color="error" width="200" :loading="ldSendCmd" @click="openClrDialog()">{{$t('CLR_CLR')}}</v-btn>
+        </v-col>
+        <v-col cols="12" class="py-5 d-flex justify-space-around">
+          <v-btn rounded color="secondary" width="200" :loading="ldSendCmd" @click="sendGetAllRawCmd()">{{$t('Get_All_Raw')}}</v-btn>
+          <v-btn rounded color="secondary" width="200" :loading="ldSendCmd" @click="openExpDialog()">{{$t('Get_All_Exp')}}</v-btn>
+        </v-col>
+
+        </v-card>
+
+        <!-- log 窗口 -->
+        <!-- <v-card class="col-12 mt-2" width="100%">
+          <v-card-text><v-form><v-textarea 
+              id="textarea-id"
+              solo
+              rows="10"
+              v-model="xxx"
+              hide-details
+              clearable
+              class="caption"
+              readonly
+          ></v-textarea></v-form></v-card-text>  
+          <v-card-actions>
+            <v-text-field 
+              cols="6" 
+              label="TX"
+              autofocus
+            ></v-text-field>
+            <v-btn>SEND</v-btn>
+          </v-card-actions>  
+        </v-card> -->
+      </v-col> 
+
+      <!-- 确认清除标定RAW参数 dialog -->
+      <v-dialog v-model="clrDialog" max-width="400">
+        <v-card>
+          <v-card-title class="headline">{{$t('Please confirm')}}</v-card-title>
+          <v-card-text>{{$t('Are you sure you want to clear all RAW?')}}</v-card-text>
+          <v-card-actions>
+            <v-spacer></v-spacer>
+            <v-btn color="green darken-1" text @click="clrDialog = false">
+              {{$t('Cancel')}}
+            </v-btn>
+            <v-btn color="red darken-1" text @click="sendClrCmd()">
+              {{$t('OK')}}
+            </v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
+
+      <!-- 确认读取全部EXP参数 dialog -->
+      <v-dialog v-model="expDialog" max-width="400">
+        <v-card>
+          <v-card-title class="headline">{{$t('Please confirm')}}</v-card-title>
+          <v-card-text>{{$t('Are you sure you want to read all EXP?')}}</v-card-text>
+          <v-card-actions>
+            <v-spacer></v-spacer>
+            <v-btn color="green darken-1" text @click="expDialog = false">
+              {{$t('Cancel')}}
+            </v-btn>
+            <v-btn color="red darken-1" text @click="sendGetAllExpCmd()">
+              {{$t('OK')}}
+            </v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
+
+      <!-- 右半屏，plots <v-col cols="4" xl="6"> -->
+      
+      <v-col cols="4" xl="5">
         <v-card outlined class="pa-2 d-flex align-content-stretch flex-wrap" height="100%">
           <v-card ref="chart1" class="col-12 pa-auto" width="100%">
             <ve-line :data="chartDataSpeed"
@@ -282,7 +411,7 @@ export default {
       selectedSerialPort: null,
       serialPorts: [],
       baudRates: [9600, 19200, 38400, 115200, 230400, 460800, 921600, 2000000],
-      baudRate: 2000000,
+      baudRate: 115200,
       serialOpened: false,
       //Vars
       deviceID: "",
@@ -295,6 +424,46 @@ export default {
       capBtnLoading: false,
       rawSigBtnLoading: false,
       filteredSigBtnLoading: false,
+      // 
+      asciiMode: true,
+      ldSendCmd: false,
+      degList1: Array.from({length: 16}, (x, i) => i * 22.5),
+      degList2: Array.from({length: 80}, (x, i) => i * 4.5),
+      spdList: [{text: 2, value: 0}, {text: 5, value: 1}, {text: 10, value: 2}, {text: 20, value: 3},
+       {text: 30, value: 4}, {text: 40, value: 5}, {text: 50, value: 6}, {text: 60, value: 7}],
+      desserts: [
+          {
+            id: 1,
+            name: 'RAW Send',
+            degIndex: 0,
+            degValue: 0,
+            spdIndex: 0,
+            objValue: 2,
+            rawValue: 2,
+            readonly: false
+          },
+          {
+            id: 2,
+            name: 'RAW Read',
+            degIndex: 0,
+            degValue: 0,
+            spdIndex: 0,
+            objValue: 0,
+            rawValue: 0,
+            readonly: true
+          },
+          {
+            id: 3,
+            name: 'EXP Read',
+            degIndex: 0,
+            degValue: 0,
+            spdIndex: 0,
+            objValue: 0,
+            rawValue: 0,
+            readonly: true
+          }],
+      clrDialog: null,
+      expDialog: null,
 
       //ota
       currentVersion: '',
@@ -378,15 +547,79 @@ export default {
     },
   },
   methods: {
+    sendRawCmd(item) {
+      let cmd = '0XA;'
+      switch(item.id) {
+        case 1:
+          item.degIndex = item.degValue / 22.5
+          cmd += `RAW=${item.degIndex}&${item.spdIndex}&${item.objValue}&${item.rawValue}`
+        break
+
+        case 2:
+          item.degIndex = item.degValue / 22.5
+          cmd += `RAW=${item.degIndex}&${item.spdIndex}`
+        break
+
+        case 3:
+          item.degIndex = item.degValue / 4.5
+          cmd += `EXP=${item.degIndex}&${item.spdIndex}`
+        break
+      }
+      ipcRenderer.send('serial-rx', `${cmd}\r\n`)
+      console.log(`Serial Tx: ${cmd}`)
+
+    },
+    sendGetAllRawCmd() {
+      if (!this.serialOpened) return
+      if (this.isCapturing) return
+      this.ldSendCmd = true
+      
+      ipcRenderer.send('serial-rx', `0XA;RAWALL?\r\n`)
+      console.log(`Serial Tx: 0XA;RAWALL?`)
+
+      setTimeout(() => {
+        this.ldSendCmd = false
+      }, 16 * 8 * (60 / (this.baudRate / 10000)))
+    },
+    sendGetAllExpCmd() {
+      if (!this.serialOpened) return
+      if (this.isCapturing) return
+      this.ldSendCmd = true
+
+      ipcRenderer.send('serial-rx', `0XA;EXPALL?\r\n`)
+      console.log(`Serial Tx: 0XA;EXPALL?`)
+      this.expDialog = false
+      
+      setTimeout(() => {
+        this.ldSendCmd = false
+      }, 80 * 8 * (60 / (this.baudRate / 10000)))
+    },
+    sendCorCmd() {
+      let cmd = '0XA;COR;'
+      ipcRenderer.send('serial-rx', `${cmd}\r\n`)
+      console.log(`Serial Tx: ${cmd}`)
+    },
+    sendClrCmd() {
+      let cmd = '0XA;CLR;'
+      ipcRenderer.send('serial-rx', `${cmd}\r\n`)
+      console.log(`Serial Tx: ${cmd}`)
+      this.clrDialog = false
+    },
     onSerialVSelectClicked() {
       ipcRenderer.send('init-serial-req')
       return true
+    },
+    openClrDialog() {
+      this.clrDialog = true
+    },
+    openExpDialog() {
+      this.expDialog = true
     },
     ConnectFn() {
       console.log(this.selectedSerialPort)
       if (!this.selectedSerialPort) return
       if (!this.serialOpened) {
-        ipcRenderer.send('serial-open-req', this.selectedSerialPort, this.baudRate)
+        ipcRenderer.send('serial-open-req', this.selectedSerialPort, this.baudRate, this.asciiMode)
       } else {
         ipcRenderer.send('serial-close-req')
       }
@@ -594,6 +827,22 @@ export default {
 
     ipcRenderer.on('stop-capture-resp', (event, arg) => {
       this.capBtnLoading = false
+    })
+
+    // 风速标定
+    ipcRenderer.on('update-wind-para', (event, arg) => {
+      let item = arg 
+      console.log(`update-wind-para: ${item.degIndex} ${item.degValue} `)
+      for (let i of this.desserts) {
+        if (i.id === item.id) {
+          i.degIndex = item.degIndex
+          i.degValue = item.degValue
+          i.spdIndex = item.spdIndex
+          i.objValue = item.objValue
+          i.rawValue = item.rawValue
+          break
+        }
+      }
     })
 
     //ota

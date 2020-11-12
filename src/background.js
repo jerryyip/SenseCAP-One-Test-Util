@@ -42,6 +42,7 @@ let sysLocale
 let serialPorts = []
 let selectedSerialPort
 let selectedSerialBaud
+let selectedAsciiMode
 let serial
 let ymodem = new yModem(true, logger.debug)
 let updating = false
@@ -62,6 +63,12 @@ let lastSpeedMaxF = 0
 let lastSpeedMinF = 0
 let lastSpeedAvgF = 0
 let lastDirAvgRaw = 0
+let lastDEG = 0
+let lastSPD = 0
+let lastOBJ = 0
+let lastRAW = 0
+let lastPA = 0
+let lastPB = 0
 let chartIndex1 = 1
 let chartIndex2 = 1
 let dsSpeedDir = []  //item: [timestamp, refSpeed, refDir, rawSpeedMax, rawSpeedMin, rawSpeedAvg,
@@ -347,11 +354,21 @@ function serialOpen(event) {
     event.reply('serial-open-resp', {opened: true, reason: ''})
   })
 
+  // get sensor value per seconds
+  let i = setInterval(() => {
+    try {
+      if (isCapturing && serial.isOpen && selectedAsciiMode) serial.write("0XA;G2?;RAWWIND?\r\n")
+    } catch (error) {
+      logger.debug(error)
+      return
+    }
+  }, 1000)
+
   serial.on('data', (data) => {
     // if (win) {
     //   win.webContents.send('serial-tx', data)
     // }
-    if (isCapturing) stream.push(data)
+    if (isCapturing || selectedAsciiMode) stream.push(data)
 
     if (winConsole) {
       winConsole.webContents.send('serial-tx', data)
@@ -364,6 +381,10 @@ function serialOpen(event) {
 
   serial.on('error', (err) => {
     logger.warn('serial error:', err)
+  })
+
+  serial.on('close', (err) => {  
+    clearInterval(i)
   })
 
   serial.open()
@@ -384,8 +405,8 @@ async function serialCloseAsync() {
   })
 }
 
-ipcMain.on('serial-open-req', (event, selPort, baud) => {
-  logger.info(`serial-open-req, ${selPort}, ${baud} ...`)
+ipcMain.on('serial-open-req', (event, selPort, baud, asciiMode) => {
+  logger.info(`serial-open-req, ${selPort}, ${baud}, ${asciiMode} ...`)
 
   if (serial && serial.isOpen) {
     if (selPort === selectedSerialPort) {
@@ -396,6 +417,7 @@ ipcMain.on('serial-open-req', (event, selPort, baud) => {
       logger.warn('request to open another port, rather', selectedSerialPort)
       selectedSerialPort = selPort
       selectedSerialBaud = baud
+      selectedAsciiMode = asciiMode
       serialClose(() => {
         serialOpen(event)
       })
@@ -403,6 +425,7 @@ ipcMain.on('serial-open-req', (event, selPort, baud) => {
   } else {
     selectedSerialPort = selPort
     selectedSerialBaud = baud
+    selectedAsciiMode = asciiMode
     serialOpen(event)
   }
 })
@@ -568,10 +591,42 @@ function addWaveSignalPoint (adcValue, label) {
 
 }
 
+function responseRawCmd () {
+  let item = {
+    "id": 2,
+    "degIndex": lastDEG / 22.5,
+    "degValue": lastDEG,
+    "spdIndex": lastSPD,
+    "objValue": lastOBJ,
+    "rawValue": lastRAW,
+  }
+
+  if (win) {
+    win.webContents.send('update-wind-para', item)
+  }
+}
+
+function responseExpCmd () {
+  let item = {
+    "id": 3,
+    "degIndex": lastDEG / 4.5,
+    "degValue": lastDEG,
+    "spdIndex": lastSPD,
+    "objValue": lastPA,
+    "rawValue": lastPB,
+  }
+
+  if (win) {
+    win.webContents.send('update-wind-para', item)
+  }
+}
+
 function parseLine(line) {
   if (customParseCallback) {
     customParseCallback(line)
   }
+
+  logger.info(`get line ${line}`)
 
   let found
   found = line.match(/^(\w+)_TX_BEG/i)
@@ -645,6 +700,98 @@ function parseLine(line) {
     addSpeedDirPoint()
     return
   }
+
+  // 0XA;G2?;RAWWIND?
+  // 0XA;DN=95.1&DM=100.8&DA=98.1&SN=1.5&SM=1.6&SA=1.6;SRN=1.6&SRM=1.6&SRA=1.6
+  // need to get DA, SN, SM, SA, SRN, SRM, SRA in 1 line
+  found = line.match(/(?<=DA=)\d+.\d+/i)
+  if (found) {
+    logger.debug('found DA:', found[0])
+    lastDirAvgRaw = parseFloat(found[0])
+  }
+  found = line.match(/(?<=SN=)\d+.\d+/i)
+  if (found) {
+    logger.debug('found SN:', found[0])
+    lastSpeedMinF = parseFloat(found[0])
+  }
+  found = line.match(/(?<=SM=)\d+.\d+/i)
+  if (found) {
+    logger.debug('found SM:', found[0])
+    lastSpeedMaxF = parseFloat(found[0])
+  }
+  found = line.match(/(?<=SA=)\d+.\d+/i)
+  if (found) {
+    logger.debug('found SA:', found[0])
+    lastSpeedAvgF = parseFloat(found[0])
+    // lastTimestamp = lastTimestamp + 1
+    // addSpeedDirPoint()
+    // return
+  }
+  found = line.match(/(?<=SRN=)\d+.\d+/i)
+  if (found) {
+    logger.debug('found SRN:', found[0])
+    lastSpeedMinRaw = parseFloat(found[0])
+  }
+  found = line.match(/(?<=SRM=)\d+.\d+/i)
+  if (found) {
+    logger.debug('found SRM:', found[0])
+    lastSpeedMaxRaw = parseFloat(found[0])
+  }
+  found = line.match(/(?<=SRA=)\d+.\d+/i)
+  if (found) {
+    logger.debug('found SRA:', found[0])
+    lastSpeedAvgRaw = parseFloat(found[0])
+    lastTimestamp = lastTimestamp + 1
+    addSpeedDirPoint()
+    return
+  }
+
+  // 0XA;RAW=> DEG=0.0, SPD=2, OBJ=2.00, RAW=3.00
+  // need to get DEG, SPD, OBJ, RAW in 1 line
+  found = line.match(/(?<==> DEG=)\d+.\d+,/i)
+  if (found) {
+    logger.debug('found DEG:', found[0])
+    lastDEG = parseFloat(found[0])
+  }
+  found = line.match(/(?<=SPD=)\d+,/i)
+  if (found) {
+    logger.debug('found SPD:', found[0])
+    let spdValue = parseInt(found[0])
+    if (spdValue == 2) lastSPD = 0
+    else if (spdValue == 5) lastSPD = 1
+    else if (spdValue == 10) lastSPD = 2
+    else if (spdValue == 20) lastSPD = 3
+    else if (spdValue == 30) lastSPD = 4
+    else if (spdValue == 40) lastSPD = 5
+    else if (spdValue == 50) lastSPD = 6
+    else if (spdValue == 60) lastSPD = 7
+    else lastSPD = 0
+  }
+  found = line.match(/(?<=OBJ=)\d+.\d+,/i)
+  if (found) {
+    logger.debug('found OBJ:', found[0])
+    lastOBJ = parseFloat(found[0])
+  }
+  found = line.match(/(?<=RAW=)\d+.\d+/i)
+  if (found) {
+    logger.debug('found RAW:', found[0])
+    lastRAW = parseFloat(found[0])
+    responseRawCmd()
+    return
+  }  
+  // 0XA;EXP=> DEG=0.0, SPD=0, PA=0.055, PB=1.000
+  found = line.match(/(?<=PA=)\d+.\d+,/i)
+  if (found) {
+    logger.debug('found PA:', found[0])
+    lastPA = parseFloat(found[0])
+  }
+  found = line.match(/(?<=PB=)\d+.\d+/i)
+  if (found) {
+    logger.debug('found PB:', found[0])
+    lastPB = parseFloat(found[0])
+    responseExpCmd()
+    return
+  }  
 }
 
 function genFilePath(ext) {
